@@ -28,8 +28,7 @@ int main(int argc, char* argv[])
     ros::init(argc, argv, "percipio_fetch_frame");
     ros::NodeHandle n;
 
-    ros::Publisher ir_l_pub = n.advertise<sensor_msgs::Image>("/base_depth/ir/left/image", 10);
-    ros::Publisher ir_r_pub = n.advertise<sensor_msgs::Image>("/base_depth/ir/right/image", 10);
+    ros::Publisher ir_pub = n.advertise<sensor_msgs::Image>("/head_camera/ir/image", 10);
 
 
     std::string ID, IP;
@@ -38,6 +37,7 @@ int main(int argc, char* argv[])
     TY_DEV_HANDLE hDevice = NULL;
     int32_t color, ir, depth;
     color = ir = depth = 1;
+    bool pub_left_ir = true;
 
     for(int i = 1; i < argc; i++) {
         if(strcmp(argv[i], "-id") == 0){
@@ -50,6 +50,8 @@ int main(int argc, char* argv[])
             depth = 0;
         } else if(strcmp(argv[i], "-ir=off") == 0) {
             ir = 0;
+        } else if(strcmp(argv[i], "-ir=right") == 0) {
+            pub_left_ir = false;
         } else if(strcmp(argv[i], "-h") == 0) {
             LOGI("Usage: SimpleView_FetchFrame [-h] [-id <ID>] [-ip <IP>]");
             return 0;
@@ -172,7 +174,7 @@ int main(int argc, char* argv[])
     while(!exit_main && ros::ok()) {
         int err = TYFetchFrame(hDevice, &frame, -1);
         if( err == TY_STATUS_OK ) {
-            LOGD("Get frame %d", ++index);
+//            LOGD("Get frame %d", ++index);
 
             int fps = get_fps();
             if (fps > 0){
@@ -185,6 +187,7 @@ int main(int argc, char* argv[])
                 depthViewer.show(depth);
             }
             if(!irl.empty()){
+                if (pub_left_ir){
                 cv_bridge::CvImage cvi_mat_ir;
                 cvi_mat_ir.encoding = sensor_msgs::image_encodings::MONO8;
                 cvi_mat_ir.image = irl;
@@ -199,10 +202,12 @@ int main(int argc, char* argv[])
                 stamp_us += ir_l_offset_stamp_us;
                 msg_raw->header.stamp.sec = stamp_us / 1000000;
                 msg_raw->header.stamp.nsec = (stamp_us - msg_raw->header.stamp.sec * 1000000) * 1000;
-                ir_l_pub.publish(msg_raw);
+                ir_pub.publish(msg_raw);
+                }
                 cv::imshow("LeftIR", irl);
             }
             if(!irr.empty()){
+                if (!pub_left_ir){
                 cv_bridge::CvImage cvi_mat_ir;
                 cvi_mat_ir.encoding = sensor_msgs::image_encodings::MONO8;
                 cvi_mat_ir.image = irr;
@@ -217,7 +222,8 @@ int main(int argc, char* argv[])
                 stamp_us += ir_r_offset_stamp_us;
                 msg_raw->header.stamp.sec = stamp_us / 1000000;
                 msg_raw->header.stamp.nsec = (stamp_us - msg_raw->header.stamp.sec * 1000000) * 1000;
-                ir_r_pub.publish(msg_raw);
+                ir_pub.publish(msg_raw);
+                }
                 cv::imshow("RightIR", irr);
             }
             if(!color.empty()){ cv::imshow("Color", color); }
@@ -234,8 +240,7 @@ int main(int argc, char* argv[])
             }
 
             TYISPUpdateDevice(hColorIspHandle);
-            LOGD("Re-enqueue buffer(%p, %d)"
-                , frame.userBuffer, frame.bufferSize);
+//            LOGD("Re-enqueue buffer(%p, %d)", frame.userBuffer, frame.bufferSize);
             ASSERT_OK( TYEnqueueBuffer(hDevice, frame.userBuffer, frame.bufferSize) );
         }
     }
