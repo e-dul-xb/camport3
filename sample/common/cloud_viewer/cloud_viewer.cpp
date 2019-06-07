@@ -756,7 +756,7 @@ namespace {
         g_cloud.vertices.reserve(point_num * 3);
         for (int idx = 0; idx < point_num; idx++){
             const TY_VECT_3F &p = points[idx];
-            if ((!isnan(p.x)) && (!isnan(p.y)) && (!isnan(p.z))){
+            if ((!std::isnan(p.x)) && (!std::isnan(p.y)) && (!std::isnan(p.z))){
                 g_cloud.vertices.push_back(p.x);
                 g_cloud.vertices.push_back(p.y);
                 g_cloud.vertices.push_back(p.z);
@@ -768,7 +768,7 @@ namespace {
             for (int idx = 0; idx < point_num; idx++){
                 const TY_VECT_3F &p = points[idx];
                 const uint8_t *pc = color + idx * 3;
-                if ((!isnan(p.x)) && (!isnan(p.y)) && (!isnan(p.z))){
+                if ((!std::isnan(p.x)) && (!std::isnan(p.y)) && (!std::isnan(p.z))){
                     g_cloud.colors.push_back(pc[0]);
                     g_cloud.colors.push_back(pc[1]);
                     g_cloud.colors.push_back(pc[2]);

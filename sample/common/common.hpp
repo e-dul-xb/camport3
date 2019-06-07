@@ -92,6 +92,18 @@ static inline int parseFrame(const TY_FRAME_DATA& frame, cv::Mat* pDepth
     return 0;
 }
 
+static inline int parseComponentTiestamp(const TY_FRAME_DATA& frame, const int32_t& component_id, uint64_t& timestamp)
+{
+    for (int i = 0; i < frame.validCount; i++){
+        if (frame.image[i].componentID == component_id){
+            timestamp = frame.image[i].timestamp;
+            break;
+        }
+    }
+
+    return 0;
+}
+
 enum{
     PC_FILE_FORMAT_XYZ = 0,
 };

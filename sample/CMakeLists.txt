@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 2.8)
 
+set (CMAKE_CXX_STANDARD 11)
+
 set(ALL_SAMPLES
     DumpAllFeatures
     ListDevices
@@ -8,6 +10,7 @@ set(ALL_SAMPLES
     NetStatistic
     DeviceStorage
     SimpleView_FetchFrame
+    SimpleView_FetchFrame_ROS
     SimpleView_Callback
     SimpleView_Registration
     SimpleView_FetchHisto
@@ -24,9 +27,10 @@ set(ALL_SAMPLES
 
 set(SAMPLES_USED_GLUT
     SimpleView_Point3D
+    SimpleView_Point3D_ROS
     )
 
-option(OPENGL_VIEW "Enable GLUT OpenGL point cloud view " OFF)
+option(OPENGL_VIEW "Enable GLUT OpenGL point cloud view " ON)
 if (NOT TARGET tycam) 
     #only build samples 
     option (OpenCV_STATIC OFF)
@@ -143,13 +147,30 @@ if (OPENGL_VIEW)
 
 endif()
 
+# ========================================
+# === ROS
+# ========================================
+find_package(roscpp REQUIRED)
+if (NOT roscpp_FOUND)
+    message(FATAL_ERROR "roscpp library not found")
+else()
+    include_directories(${roscpp_INCLUDE_DIRS})
+endif()
+
+find_package(cv_bridge REQUIRED)
+if (NOT cv_bridge_FOUND)
+    message(FATAL_ERROR "cv_bridge library not found")
+else()
+    include_directories(${cv_bridge_INCLUDE_DIRS})
+endif()
+
 foreach(sample ${ALL_SAMPLES})
     get_filename_component(spath "${sample}" ABSOLUTE )
     if (EXISTS "${spath}/")
         file(GLOB sources ${sample}/*.cpp)
         add_executable(${sample} ${sources})
         add_dependencies(${sample} sample_common ${TARGET_LIB})
-        target_link_libraries(${sample} sample_common ${ABSOLUTE_TARGET_LIB} ${OpenCV_LIBS} ${CLOUD_VIEWER})
+        target_link_libraries(${sample} sample_common ${ABSOLUTE_TARGET_LIB} ${OpenCV_LIBS} ${roscpp_LIBRARIES} ${cv_bridge_LIBRARIES} ${CLOUD_VIEWER})
         set_target_properties(${sample} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/)
         install(TARGETS ${sample} RUNTIME DESTINATION samples/)
     endif()
