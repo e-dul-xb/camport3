@@ -164,13 +164,25 @@ else()
     include_directories(${cv_bridge_INCLUDE_DIRS})
 endif()
 
+# ========================================
+# === PCL
+# ========================================
+
+find_package(PCL REQUIRED)
+if (NOT PCL_FOUND)
+    message(FATAL_ERROR "PCL library not found")
+else()
+    include_directories(${PCL_INCLUDE_DIRS})
+endif()
+
+
 foreach(sample ${ALL_SAMPLES})
     get_filename_component(spath "${sample}" ABSOLUTE )
     if (EXISTS "${spath}/")
         file(GLOB sources ${sample}/*.cpp)
         add_executable(${sample} ${sources})
         add_dependencies(${sample} sample_common ${TARGET_LIB})
-        target_link_libraries(${sample} sample_common ${ABSOLUTE_TARGET_LIB} ${OpenCV_LIBS} ${roscpp_LIBRARIES} ${cv_bridge_LIBRARIES} ${CLOUD_VIEWER})
+        target_link_libraries(${sample} sample_common ${ABSOLUTE_TARGET_LIB} ${OpenCV_LIBS} ${roscpp_LIBRARIES} ${cv_bridge_LIBRARIES} ${PCL_LIBRARIES} ${CLOUD_VIEWER})
         set_target_properties(${sample} PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin/)
         install(TARGETS ${sample} RUNTIME DESTINATION samples/)
     endif()

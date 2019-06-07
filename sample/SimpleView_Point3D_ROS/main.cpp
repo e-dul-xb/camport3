@@ -5,6 +5,14 @@
 #include "../common/cloud_viewer/cloud_viewer.hpp"
 #include "TYImageProc.h"
 
+#include <chrono>
+
+#include <ros/ros.h>
+//#include <sensor_msgs/Image.h>
+#include <sensor_msgs/PointCloud.h>
+#include <pcl/point_cloud.h>
+#include <pcl/point_types.h>
+#include <pcl_ros/point_cloud.h>
 
 struct CallbackData {
     int             index;
@@ -12,6 +20,10 @@ struct CallbackData {
     TY_ISP_HANDLE   isp_handle;
     TY_CAMERA_CALIB_INFO depth_calib; 
     TY_CAMERA_CALIB_INFO color_calib;
+    int64_t stamp_offset_us;
+
+    pcl::PointCloud<pcl::PointXYZ> cloud;
+    ros::Publisher cloud_pub;
 
     bool saveOneFramePoint3d;
     bool exit_main;
@@ -68,15 +80,34 @@ static void handleFrame(TY_FRAME_DATA* frame, void* userdata) {
 
     cv::Mat depth, color;
     parseFrame(*frame, &depth, NULL, NULL, &color, isp_handle);
+    uint64_t stamp_us = 0;
+    parseComponentTiestamp(*frame, TY_COMPONENT_DEPTH_CAM, stamp_us);
     if(!depth.empty()){
         std::vector<TY_VECT_3F> p3d;
         p3d.resize(depth.size().area());
         ASSERT_OK(TYMapDepthImageToPoint3d(&pData->depth_calib, depth.cols, depth.rows
             , (uint16_t*)depth.data, &p3d[0]));
-        for (int idx = 0; idx < p3d.size(); idx++){
-            p3d[idx].y = -p3d[idx].y;
-            p3d[idx].z = -p3d[idx].z;
+
+        if(pData->stamp_offset_us == 0){
+          // reference first timestamp
+          pData->stamp_offset_us = std::chrono::duration_cast<std::chrono::milliseconds>(
+                      std::chrono::system_clock::now().time_since_epoch()).count() * 1000 - stamp_us;
         }
+
+        pData->cloud.header.stamp = stamp_us + pData->stamp_offset_us; // us_since_epoch
+
+        for(size_t i = 0; i < pData->cloud.points.size(); ++i){
+            pcl::PointXYZ & p = pData->cloud.points[i];
+            p.x = p3d[i].x / 1000.f;
+            p.y = p3d[i].y / 1000.f;
+            p.z = p3d[i].z / 1000.f;
+        }
+        pData->cloud_pub.publish(pData->cloud);
+
+//        for (int idx = 0; idx < p3d.size(); idx++){
+//            p3d[idx].y = -p3d[idx].y;
+//            p3d[idx].z = -p3d[idx].z;
+//        }
         uint8_t *color_data = NULL;
         cv::Mat color_data_mat;
         if (!color.empty()){
@@ -141,6 +172,10 @@ bool key_pressed(int key){
 
 int main(int argc, char* argv[])
 {
+    ros::init(argc, argv, "percipio_point_3d");
+    ros::NodeHandle n;
+
+
     GLPointCloudViewer::GlInit();
     std::string ID, IP;
     TY_INTERFACE_HANDLE hIface = NULL;
@@ -233,6 +268,14 @@ int main(int argc, char* argv[])
     cb_data.saveOneFramePoint3d = false;
     cb_data.fileIndex = 0;
     cb_data.exit_main = false;
+    // VGA cloud is assumption above
+    cb_data.cloud_pub = n.advertise<pcl::PointCloud<pcl::PointXYZ>>("/base_depth/depth/points", 10);
+    cb_data.cloud.width = 640;
+    cb_data.cloud.height = 480;
+    cb_data.cloud.points.resize(640*480);
+    cb_data.cloud.is_dense = false;
+    cb_data.cloud.header.frame_id = "base_depth_optical_frame";
+    cb_data.stamp_offset_us = 0;
     //start a thread to fetch image data
     TYThread fetch_thread;
     fetch_thread.create(FetchFrameThreadFunc, &cb_data);
