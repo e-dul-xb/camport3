@@ -22,7 +22,7 @@ struct CallbackData {
     TY_CAMERA_CALIB_INFO color_calib;
     int64_t stamp_offset_us;
 
-    pcl::PointCloud<pcl::PointXYZ> cloud;
+    pcl::PointCloud<pcl::PointXYZRGB> cloud;
     ros::Publisher cloud_pub;
 
     bool saveOneFramePoint3d;
@@ -96,14 +96,6 @@ static void handleFrame(TY_FRAME_DATA* frame, void* userdata) {
 
         pData->cloud.header.stamp = stamp_us + pData->stamp_offset_us; // us_since_epoch
 
-        for(size_t i = 0; i < pData->cloud.points.size(); ++i){
-            pcl::PointXYZ & p = pData->cloud.points[i];
-            p.x = p3d[i].x / 1000.f;
-            p.y = p3d[i].y / 1000.f;
-            p.z = p3d[i].z / 1000.f;
-        }
-        pData->cloud_pub.publish(pData->cloud);
-
 //        for (int idx = 0; idx < p3d.size(); idx++){
 //            p3d[idx].y = -p3d[idx].y;
 //            p3d[idx].z = -p3d[idx].z;
@@ -112,9 +104,21 @@ static void handleFrame(TY_FRAME_DATA* frame, void* userdata) {
         cv::Mat color_data_mat;
         if (!color.empty()){
             doRgbRegister(pData->depth_calib, pData->color_calib, depth, color, color_data_mat);
-            cv::cvtColor(color_data_mat, color_data_mat, CV_BGR2RGB);
+            //cv::cvtColor(color_data_mat, color_data_mat, CV_BGR2RGB);
             color_data = color_data_mat.ptr<uint8_t>();
         }
+
+        for(size_t i = 0; i < pData->cloud.points.size(); ++i){
+            pcl::PointXYZRGB & p = pData->cloud.points[i];
+            p.x = p3d[i].x / 1000.f;
+            p.y = p3d[i].y / 1000.f;
+            p.z = p3d[i].z / 1000.f;
+	    p.b = *color_data; color_data++;
+	    p.g = *color_data; color_data++;
+            p.r = *color_data; color_data++;
+        }
+        pData->cloud_pub.publish(pData->cloud);
+
         GLPointCloudViewer::Update(p3d.size(), &p3d[0], color_data);
 
         if (pData->saveOneFramePoint3d){
@@ -269,7 +273,7 @@ int main(int argc, char* argv[])
     cb_data.fileIndex = 0;
     cb_data.exit_main = false;
     // VGA cloud is assumption above
-    cb_data.cloud_pub = n.advertise<pcl::PointCloud<pcl::PointXYZ>>("/base_depth/depth/points", 10);
+    cb_data.cloud_pub = n.advertise<pcl::PointCloud<pcl::PointXYZRGB>>("/base_depth/depth/points", 10);
     cb_data.cloud.width = 640;
     cb_data.cloud.height = 480;
     cb_data.cloud.points.resize(640*480);
